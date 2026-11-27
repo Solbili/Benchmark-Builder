@@ -458,6 +458,10 @@ En **Storage**: bucket privado `presupuestos`, signed URL de 7 días.
       crédito, vigentes desde el 27/11. Las vigencias anteriores cerraron el
       26/11; los presupuestos emitidos no cambian. La migración 25 nunca se
       había aplicado en producción: la 26 trae su `crear_presupuesto()`
+      De esa planilla se cargó sólo la lista particular: las columnas y
+      tablas de obras sociales (coseguro Sancor, Sancor y Swiss Medical por
+      código, Boreal, APROSS y Nobis) **no se cargan**, por decisión del
+      consultorio
 - [x] Precio en crédito (3 cuotas sin interés, los miércoles) como segundo
       precio de lista: se carga en la vigencia, el wizard lo copia del arancel
       y el documento congela el total en crédito. Detalle, preview del paso 3,
@@ -700,11 +704,6 @@ antes de aceptarlo. Los que resultaron reales:
       del aumento masivo la columna de crédito (la RPC ya lo sube).
 - [ ] Precios en dólares: «Implantes 650 USD» de la lista nueva no se puede
       cargar, la base sólo maneja pesos.
-- [ ] Lista nueva de Córdoba, parte de obras sociales: falta definir cómo se
-      cargan la columna «Coseguro Sancor» y las tablas de Sancor y Swiss
-      Medical por código (301/302/303, extracciones). Las tablas de Boreal,
-      APROSS y Nobis del final de la planilla **no se cargan** (decisión del
-      consultorio, 27/11).
 - [ ] Recordatorio automático a los 7 días por WhatsApp (hoy sólo se promete en
       la confirmación de envío; el cambio de estado sí es automático).
 - [ ] Decidir si un presupuesto con subtotal $ 0 debe rechazarse. Hoy se
