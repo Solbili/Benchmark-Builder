@@ -22,7 +22,14 @@
 
 import { Circle, Document, Page, Path, Rect, Svg, Text, View } from '@react-pdf/renderer'
 
-import { fechaLarga, matricula, money, porcentaje } from '@/lib/formato'
+import {
+  fechaLarga,
+  matricula,
+  money,
+  PAGO_CREDITO,
+  PAGO_EFECTIVO,
+  porcentaje,
+} from '@/lib/formato'
 
 import { lineasContacto } from './consultorio'
 import type { DatosPdf, ItemPdf } from './datos'
@@ -155,7 +162,19 @@ function Totales({ datos }: { datos: DatosPdf }) {
       <View style={estilos.cajaACargo}>
         <Text style={estilos.etiquetaACargo}>A CARGO DEL PACIENTE</Text>
         <Text style={estilos.montoACargo}>{money(datos.totalACargo)}</Text>
+        {datos.totalACargoCredito !== null && (
+          <Text style={estilos.notaACargo}>{PAGO_EFECTIVO}</Text>
+        )}
       </View>
+
+      {/* La otra forma de pago, con su propio precio de lista. Va debajo
+          y sin color: el número héroe sigue siendo uno solo. */}
+      {datos.totalACargoCredito !== null && (
+        <View style={[estilos.filaTotal, estilos.filaCredito]}>
+          <Text style={estilos.etiquetaCredito}>{PAGO_CREDITO}</Text>
+          <Text style={estilos.montoCredito}>{money(datos.totalACargoCredito)}</Text>
+        </View>
+      )}
     </View>
   )
 }

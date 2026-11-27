@@ -54,6 +54,8 @@ export interface CabeceraPresupuesto {
   subtotal: number
   total_cobertura: number
   total_a_cargo: number
+  /** null = el presupuesto no ofrece pagar con crédito. */
+  total_a_cargo_credito: number | null
   observaciones: string | null
   nota_interna: string | null
   motivo_perdida: MotivoPerdida | null
@@ -82,6 +84,7 @@ export const COLUMNAS_CABECERA = [
   'subtotal',
   'total_cobertura',
   'total_a_cargo',
+  'total_a_cargo_credito',
   'observaciones',
   'nota_interna',
   'motivo_perdida',
@@ -110,6 +113,8 @@ export function aCabecera(fila: FilaCruda): CabeceraPresupuesto {
     subtotal: monto(fila.subtotal),
     total_cobertura: monto(fila.total_cobertura),
     total_a_cargo: monto(fila.total_a_cargo),
+    total_a_cargo_credito:
+      fila.total_a_cargo_credito == null ? null : monto(fila.total_a_cargo_credito),
     observaciones: textoOpcional(fila.observaciones),
     nota_interna: textoOpcional(fila.nota_interna),
     motivo_perdida: (fila.motivo_perdida ?? null) as MotivoPerdida | null,
@@ -135,6 +140,8 @@ export function aItem(fila: FilaCruda): PresupuestoItem {
     cobertura_valor: monto(fila.cobertura_valor),
     cobertura_monto: monto(fila.cobertura_monto),
     a_cargo: monto(fila.a_cargo),
+    monto_credito: fila.monto_credito == null ? null : monto(fila.monto_credito),
+    a_cargo_credito: fila.a_cargo_credito == null ? null : monto(fila.a_cargo_credito),
     editado: Boolean(fila.editado),
     cobertura_original_tipo: (fila.cobertura_original_tipo ?? null) as CoberturaTipo | null,
     cobertura_original_valor:

@@ -53,6 +53,8 @@ export interface DatosPdf {
   subtotal: number
   totalCobertura: number
   totalACargo: number
+  /** A cargo pagando con crédito. null = el documento no ofrece la opción. */
+  totalACargoCredito: number | null
   observaciones: string | null
   consultorio: DatosConsultorio
 }
@@ -106,6 +108,7 @@ const COLUMNAS_PRESUPUESTO = [
   'subtotal',
   'total_cobertura',
   'total_a_cargo',
+  'total_a_cargo_credito',
   'observaciones',
   'pdf_path',
 ].join(', ')
@@ -251,6 +254,10 @@ export async function cargarDocumentoPdf(
     subtotal: aNumero(fila.subtotal),
     totalCobertura: aNumero(fila.total_cobertura),
     totalACargo: aNumero(fila.total_a_cargo),
+    totalACargoCredito:
+      fila.total_a_cargo_credito === null || fila.total_a_cargo_credito === undefined
+        ? null
+        : aNumero(fila.total_a_cargo_credito),
     observaciones: aTexto(fila.observaciones),
     consultorio: datosConsultorio(),
   }

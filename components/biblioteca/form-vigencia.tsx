@@ -16,7 +16,7 @@ import {
   ResponsiveModal,
   Segmented,
 } from '@/components/ui'
-import { calcularItem, montoConAumento } from '@/lib/calculo'
+import { aCargoCredito, calcularItem, montoConAumento } from '@/lib/calculo'
 import { fechaCorta, fechaLarga, isoDate, money, numero } from '@/lib/formato'
 import type { CoberturaTipo } from '@/lib/types'
 
@@ -62,6 +62,10 @@ export function FormVigencia({
   const abiertaEsFutura = actual !== null && actual.id !== hoyRige?.id
 
   const [monto, setMonto] = React.useState<number>(actual ? Math.round(actual.monto) : 0)
+  // 0 = sin precio en crédito. El input de montos no tiene «vacío».
+  const [credito, setCredito] = React.useState<number>(
+    actual?.monto_credito != null ? Math.round(Number(actual.monto_credito)) : 0,
+  )
   const [tipo, setTipo] = React.useState<CoberturaTipo>(
     actual ? actual.cobertura_tipo : celda.obra_social_id ? 'porcentaje' : 'ninguna',
   )
@@ -72,6 +76,7 @@ export function FormVigencia({
   const [guardando, iniciar] = React.useTransition()
 
   const { cobertura, aCargo } = calcularItem(monto, tipo, valor)
+  const aCargoEnCredito = credito > 0 ? aCargoCredito(credito, tipo, valor) : null
 
   // Una vigencia nueva no puede arrancar el mismo día que la abierta:
   // el cierre de la anterior quedaría un día antes de su propio inicio.
@@ -115,6 +120,7 @@ export function FormVigencia({
         monto,
         cobertura_tipo: tipo,
         cobertura_valor: tipo === 'ninguna' ? 0 : valor,
+        monto_credito: credito > 0 ? credito : null,
         desde,
       })
 
@@ -207,15 +213,23 @@ export function FormVigencia({
           <div className="flex flex-wrap items-center gap-2">
             <span className="t-label">Aumentar</span>
             {ATAJOS.map((pct) => {
-              // Misma cuenta que el aumento masivo y que la RPC.
+              // Misma cuenta que el aumento masivo y que la RPC, que
+              // sube los dos precios por igual.
               const nuevo = montoConAumento(actual.monto, pct)
+              const nuevoCredito =
+                actual.monto_credito != null
+                  ? montoConAumento(Number(actual.monto_credito), pct)
+                  : 0
               return (
                 <Button
                   key={pct}
                   type="button"
                   variant={monto === nuevo ? 'secondary' : 'ghost'}
                   size="sm"
-                  onClick={() => setMonto(nuevo)}
+                  onClick={() => {
+                    setMonto(nuevo)
+                    setCredito(nuevoCredito)
+                  }}
                 >
                   +{pct} % · {money(nuevo)}
                 </Button>
@@ -223,6 +237,22 @@ export function FormVigencia({
             })}
           </div>
         )}
+
+        <Field
+          label="Precio en crédito"
+          htmlFor="vigencia-credito"
+          helper={
+            actual?.monto_credito != null
+              ? `3 cuotas sin interés, los miércoles. Hoy está en ${money(
+                  Number(actual.monto_credito),
+                )}. En 0, el presupuesto no ofrece pagar con crédito.`
+              : '3 cuotas sin interés, los miércoles. En 0, el presupuesto no ofrece pagar con crédito.'
+          }
+        >
+          <div className="max-w-[200px]">
+            <InputMonto id="vigencia-credito" value={credito} onChange={setCredito} />
+          </div>
+        </Field>
 
         <Field label="Cobertura" htmlFor="vigencia-tipo">
           <Segmented
@@ -316,6 +346,12 @@ export function FormVigencia({
             <span className="font-sans text-[14px] text-body">
               Queda a cargo <Monto valor={aCargo} jerarquia="fuerte" />
             </span>
+            {aCargoEnCredito !== null && (
+              <span className="t-helper">
+                Con crédito{' '}
+                <Monto valor={aCargoEnCredito} jerarquia="normal" className="text-[13px]" />
+              </span>
+            )}
           </div>
         </div>
 

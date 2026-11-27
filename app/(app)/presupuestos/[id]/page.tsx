@@ -407,6 +407,7 @@ export default async function DetallePresupuestoPage(
               subtotal={cabecera.subtotal}
               cobertura={cabecera.total_cobertura}
               aCargo={cabecera.total_a_cargo}
+              aCargoCredito={cabecera.total_a_cargo_credito}
               cuotas={cuotas}
               fallaronCuotas={fallaronCuotas}
               observaciones={cabecera.observaciones}

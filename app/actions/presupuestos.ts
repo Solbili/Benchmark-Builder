@@ -54,6 +54,17 @@ const itemSchema = z
       .number()
       .min(0, 'La cobertura no puede ser negativa.')
       .max(999_999_999, 'Esa cobertura es demasiado grande. Revisá los ceros.'),
+    /**
+     * Precio en crédito copiado del arancel. La base resuelve lo que
+     * queda a cargo así, igual que con el monto.
+     */
+    monto_credito: z
+      .number()
+      .int('Los montos van en pesos enteros.')
+      .min(0, 'Un monto no puede ser negativo.')
+      .max(999_999_999, 'Ese monto es demasiado grande. Revisá los ceros.')
+      .nullable()
+      .default(null),
     editado: z.boolean().default(false),
     cobertura_original_tipo: tipoCobertura.nullable().default(null),
     cobertura_original_valor: z

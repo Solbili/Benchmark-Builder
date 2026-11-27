@@ -388,3 +388,17 @@ export function telefonoWhatsApp(telefono: string | null | undefined): string | 
 
   return `549${d}`
 }
+
+/**
+ * Cómo se nombra el precio en crédito en todo lo que ve el paciente
+ * (detalle, PDF, WhatsApp). Un solo texto para que las tres superficies
+ * digan lo mismo: es la condición que el consultorio se compromete a
+ * respetar.
+ */
+export const PAGO_CREDITO = 'Con tarjeta de crédito: 3 cuotas sin interés, los miércoles'
+
+/** La versión corta, para etiquetas donde no entra la frase entera. */
+export const PAGO_CREDITO_CORTO = 'Crédito, 3 cuotas s/interés (miércoles)'
+
+/** Cómo se nombra el precio de siempre cuando aparece al lado del de crédito. */
+export const PAGO_EFECTIVO = 'Efectivo o transferencia'

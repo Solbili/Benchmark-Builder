@@ -204,6 +204,8 @@ export interface Arancel {
   prestacion_id: string
   obra_social_id: string | null
   monto: number
+  /** Precio en crédito (3 cuotas sin interés). null = no tiene. */
+  monto_credito: number | null
   cobertura_tipo: CoberturaTipo
   cobertura_valor: number
   vigente_desde: string
@@ -235,6 +237,7 @@ export interface FilaHistorico {
   obra_social_id: string | null
   obra_social: string
   monto: number
+  monto_credito: number | null
   cobertura_tipo: CoberturaTipo
   cobertura_valor: number
   vigente_desde: string

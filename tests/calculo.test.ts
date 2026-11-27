@@ -11,6 +11,8 @@ import {
   cuotasSuman100,
   compararConHoy,
   montoConAumento,
+  aCargoCredito,
+  totalCredito,
   type CoberturaTipo,
 } from '../lib/calculo.ts'
 
@@ -137,4 +139,36 @@ test('montoConAumento coincide con la cuenta de aumento_masivo()', () => {
       )
     }
   }
+})
+
+test('aCargoCredito: la obra social cubre lo mismo pague como pague', () => {
+  // Particular: el precio en crédito entero.
+  assert.equal(aCargoCredito(105000, 'ninguna', 0), 105000)
+  // Monto fijo: se descuenta el mismo fijo del precio en crédito.
+  assert.equal(aCargoCredito(84000, 'monto', 30000), 54000)
+  // Porcentaje: el mismo porcentaje sobre el precio en crédito.
+  assert.equal(aCargoCredito(105000, 'porcentaje', 50), 52500)
+  // Un fijo mayor que el precio en crédito no deja un a-cargo negativo.
+  assert.equal(aCargoCredito(12000, 'monto', 20000), 0)
+})
+
+test('totalCredito: null si nadie tiene precio en crédito', () => {
+  assert.equal(totalCredito([]), null)
+  assert.equal(
+    totalCredito([{ monto: 1000, cobertura_tipo: 'ninguna', cobertura_valor: 0, monto_credito: null }]),
+    null,
+  )
+})
+
+test('totalCredito: la línea sin precio en crédito suma su a-cargo de efectivo', () => {
+  // Mismos tres ítems que el caso probado contra la base en la migración 26:
+  // 54.000 + 25.000 + 0 = 79.000.
+  assert.equal(
+    totalCredito([
+      { monto: 80000, cobertura_tipo: 'monto', cobertura_valor: 30000, monto_credito: 84000 },
+      { monto: 50000, cobertura_tipo: 'porcentaje', cobertura_valor: 50, monto_credito: null },
+      { monto: 10000, cobertura_tipo: 'monto', cobertura_valor: 20000, monto_credito: 12000 },
+    ]),
+    79000,
+  )
 })

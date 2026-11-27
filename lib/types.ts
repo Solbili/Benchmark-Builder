@@ -91,6 +91,8 @@ export interface Arancel {
   prestacion_id: string
   obra_social_id: string | null
   monto: number
+  /** Precio pagando con crédito (3 cuotas sin interés). null = no tiene. */
+  monto_credito: number | null
   cobertura_tipo: CoberturaTipo
   cobertura_valor: number
   vigente_desde: string
@@ -126,6 +128,8 @@ export interface Presupuesto {
   subtotal: number
   total_cobertura: number
   total_a_cargo: number
+  /** A cargo pagando con crédito. null = el documento no ofrece la opción. */
+  total_a_cargo_credito: number | null
   observaciones: string | null
   estado: EstadoPresupuesto
   estado_desde: string
@@ -161,6 +165,8 @@ export interface PresupuestoItem {
   cobertura_valor: number
   cobertura_monto: number
   a_cargo: number
+  monto_credito: number | null
+  a_cargo_credito: number | null
   editado: boolean
   cobertura_original_tipo: CoberturaTipo | null
   cobertura_original_valor: number | null
@@ -215,6 +221,12 @@ export interface ItemBorrador {
   motivo_override: string | null
   /** monto del arancel, para poder restaurar y para el helper auditable */
   monto_original: number | null
+  /**
+   * Precio en crédito del arancel. Vale sólo mientras el monto sea el
+   * del arancel: ver `creditoDelItem()`. Opcional porque un borrador
+   * guardado antes de que existiera no lo trae.
+   */
+  monto_credito?: number | null
 }
 
 export interface CuotaBorrador {

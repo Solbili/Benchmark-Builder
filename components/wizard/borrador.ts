@@ -80,7 +80,29 @@ export function itemDesdeArancel(prestacion: Prestacion, arancel: Arancel): Item
     cobertura_original_valor: null,
     motivo_override: null,
     monto_original: Math.round(Number(arancel.monto)),
+    monto_credito: aPesos(arancel.monto_credito),
   }
+}
+
+/** numeric de la base → pesos enteros, respetando el null. */
+function aPesos(valor: number | string | null | undefined): number | null {
+  return valor === null || valor === undefined ? null : Math.round(Number(valor))
+}
+
+/**
+ * El precio en crédito que el ítem ofrece, o `null`.
+ *
+ * Vale sólo mientras el monto sea el del arancel. Un monto editado a
+ * mano es un precio que alguien decidió para este paciente, y la lista
+ * no dice cuánto sería ESE precio en crédito: inventarlo sería poner en
+ * el documento un número que nadie autorizó. Restaurar el arancel lo
+ * devuelve.
+ */
+export function creditoDelItem(item: ItemBorrador): number | null {
+  const credito = item.monto_credito ?? null
+  if (credito === null) return null
+  if (item.monto_original === null || item.monto !== item.monto_original) return null
+  return credito
 }
 
 /**
@@ -199,6 +221,7 @@ export function aPayload(borrador: BorradorPresupuesto): PayloadPresupuesto {
       monto: Math.round(i.monto),
       cobertura_tipo: i.cobertura_tipo,
       cobertura_valor: i.cobertura_valor,
+      monto_credito: creditoDelItem(i),
       editado: i.editado,
       cobertura_original_tipo: i.cobertura_original_tipo,
       cobertura_original_valor: i.cobertura_original_valor,
@@ -246,6 +269,7 @@ export function recotizarItem(
       arancel_id: elegido.id,
       monto,
       monto_original: monto,
+      monto_credito: aPesos(elegido.monto_credito),
       cobertura_tipo: esParticular ? 'ninguna' : elegido.cobertura_tipo,
       cobertura_valor: esParticular ? 0 : Number(elegido.cobertura_valor),
       editado: false,

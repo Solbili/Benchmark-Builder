@@ -56,6 +56,7 @@ interface ArancelBase {
   prestacion_id: string
   obra_social_id: string | null
   monto: number
+  monto_credito: number | null
   cobertura_tipo: CoberturaTipo
   cobertura_valor: number
   vigente_desde: string
@@ -81,7 +82,7 @@ export default async function ArancelesPage(props: PageProps<'/biblioteca/arance
     supabase
       .from('aranceles_vigentes')
       .select(
-        'id, prestacion_id, obra_social_id, monto, cobertura_tipo, cobertura_valor, vigente_desde, vigente_hasta, usos',
+        'id, prestacion_id, obra_social_id, monto, monto_credito, cobertura_tipo, cobertura_valor, vigente_desde, vigente_hasta, usos',
       ),
     // Aumentos ya cargados que todavía no arrancaron. No se cotizan,
     // pero la celda tiene que avisar que existen: si no, alguien que
@@ -95,7 +96,7 @@ export default async function ArancelesPage(props: PageProps<'/biblioteca/arance
     supabase
       .from('aranceles_programados')
       .select(
-        'id, prestacion_id, obra_social_id, monto, cobertura_tipo, cobertura_valor, vigente_desde, vigente_hasta',
+        'id, prestacion_id, obra_social_id, monto, monto_credito, cobertura_tipo, cobertura_valor, vigente_desde, vigente_hasta',
       )
       .order('vigente_desde'),
   ])
@@ -131,6 +132,7 @@ export default async function ArancelesPage(props: PageProps<'/biblioteca/arance
     prestacion_id: v.prestacion_id,
     obra_social_id: v.obra_social_id,
     monto: Number(v.monto),
+    monto_credito: v.monto_credito === null ? null : Number(v.monto_credito),
     cobertura_tipo: v.cobertura_tipo,
     cobertura_valor: Number(v.cobertura_valor),
     vigente_desde: soloFecha(v.vigente_desde),
@@ -146,6 +148,7 @@ export default async function ArancelesPage(props: PageProps<'/biblioteca/arance
       prestacion_id: p.prestacion_id,
       obra_social_id: p.obra_social_id,
       monto: Number(p.monto),
+      monto_credito: p.monto_credito === null ? null : Number(p.monto_credito),
       cobertura_tipo: p.cobertura_tipo,
       cobertura_valor: Number(p.cobertura_valor),
       vigente_desde: soloFecha(p.vigente_desde),
@@ -203,7 +206,7 @@ export default async function ArancelesPage(props: PageProps<'/biblioteca/arance
       supabase
         .from('aranceles')
         .select(
-          'id, prestacion_id, obra_social_id, monto, cobertura_tipo, cobertura_valor, vigente_desde, vigente_hasta',
+          'id, prestacion_id, obra_social_id, monto, monto_credito, cobertura_tipo, cobertura_valor, vigente_desde, vigente_hasta',
         )
         .order('vigente_desde', { ascending: false })
         .order('created_at', { ascending: false })
@@ -245,6 +248,7 @@ export default async function ArancelesPage(props: PageProps<'/biblioteca/arance
           ? (nombreOs.get(a.obra_social_id) ?? 'Obra social')
           : PARTICULAR,
         monto: Number(a.monto),
+        monto_credito: a.monto_credito === null ? null : Number(a.monto_credito),
         cobertura_tipo: a.cobertura_tipo,
         cobertura_valor: Number(a.cobertura_valor),
         vigente_desde: soloFecha(a.vigente_desde),

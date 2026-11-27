@@ -29,11 +29,19 @@
 
 import * as React from 'react'
 
-import { calcularItem, calcularTotales, repartirCuotas } from '@/lib/calculo'
-import { fechaCorta, fechaLarga, money, porcentaje as fmtPorcentaje } from '@/lib/formato'
+import { calcularItem, calcularTotales, repartirCuotas, totalCredito } from '@/lib/calculo'
+import {
+  fechaCorta,
+  fechaLarga,
+  money,
+  PAGO_CREDITO,
+  porcentaje as fmtPorcentaje,
+} from '@/lib/formato'
 import type { BorradorPresupuesto, CoberturaTipo, ItemBorrador, Paciente } from '@/lib/types'
 import { datosConsultorio } from '@/lib/pdf/consultorio'
 import { cn } from '@/lib/utils'
+
+import { creditoDelItem } from './borrador'
 
 // La misma constante que imprime el PDF: el preview del paso 3 tiene que
 // mostrar exactamente lo que va a salir en el documento.
@@ -77,6 +85,10 @@ export function PreviewPdf({
   className?: string
 }) {
   const totales = calcularTotales(borrador.items)
+  // Misma regla que congela `crear_presupuesto()`.
+  const aCargoEnCredito = totalCredito(
+    borrador.items.map((i) => ({ ...i, monto_credito: creditoDelItem(i) })),
+  )
   const montosCuotas = repartirCuotas(
     totales.aCargo,
     borrador.cuotas.map((c) => c.porcentaje),
@@ -217,6 +229,12 @@ export function PreviewPdf({
                 {money(totales.aCargo)}
               </span>
             </div>
+            {aCargoEnCredito !== null && (
+              <div className="flex items-baseline justify-between gap-2 text-[10px] text-muted">
+                <span className="min-w-0">{PAGO_CREDITO}</span>
+                <span className="shrink-0 tabular-nums text-ink">{money(aCargoEnCredito)}</span>
+              </div>
+            )}
           </section>
 
           {/* Condiciones de pago — el PDF imprime la sección siempre. */}
