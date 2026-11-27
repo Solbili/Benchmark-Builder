@@ -533,6 +533,14 @@ const vigenciaSchema = z
       .number()
       .min(0, 'La cobertura no puede ser negativa.')
       .max(999_999_999),
+    /** Precio en crédito (3 cuotas sin interés). null = sin precio en crédito. */
+    monto_credito: z
+      .number()
+      .int('Los montos van en pesos enteros.')
+      .min(0, 'Un monto no puede ser negativo.')
+      .max(999_999_999, 'Ese monto es demasiado grande. Revisá los ceros.')
+      .nullable()
+      .default(null),
     desde: fecha,
   })
   .refine((v) => v.cobertura_tipo !== 'porcentaje' || v.cobertura_valor <= 100, {
@@ -565,6 +573,7 @@ export async function crearVigencia(entrada: EntradaVigencia): Promise<Resultado
     p_cob_tipo: v.cobertura_tipo,
     p_cob_valor: v.cobertura_valor,
     p_desde: v.desde,
+    p_monto_credito: v.monto_credito,
   })
 
   if (error) return { ok: false, error: mensajeDeError(error.message) }

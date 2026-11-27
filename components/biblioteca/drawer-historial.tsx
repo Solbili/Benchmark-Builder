@@ -14,6 +14,7 @@ import { etiquetaCoberturaLarga, soloFecha, type Celda } from './tipos'
 interface Vigencia {
   id: string
   monto: number
+  monto_credito: number | null
   cobertura_tipo: CoberturaTipo
   cobertura_valor: number
   vigente_desde: string
@@ -221,6 +222,14 @@ function VigenciaActual({ vigencia }: { vigencia: Vigencia }) {
             <Monto valor={aCargo} jerarquia="fuerte" />
           </dd>
         </div>
+        {vigencia.monto_credito != null && (
+          <div className="flex items-baseline justify-between gap-3">
+            <dt className="text-muted">Precio en crédito</dt>
+            <dd>
+              <Monto valor={Number(vigencia.monto_credito)} jerarquia="normal" />
+            </dd>
+          </div>
+        )}
         <div className="flex items-baseline justify-between gap-3">
           <dt className="text-muted">Presupuestos que la usan</dt>
           <dd className="tabular-nums text-ink">{numero(vigencia.usos)}</dd>
@@ -276,7 +285,7 @@ async function traerVigencias(
 
   const base = supabase
     .from('aranceles')
-    .select('id, monto, cobertura_tipo, cobertura_valor, vigente_desde, vigente_hasta')
+    .select('id, monto, monto_credito, cobertura_tipo, cobertura_valor, vigente_desde, vigente_hasta')
     .eq('prestacion_id', prestacionId)
 
   const { data, error } = await (obraSocialId

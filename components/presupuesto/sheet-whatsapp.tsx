@@ -67,6 +67,7 @@ interface DatosEnvio {
   telefono: string | null
   tieneWhatsapp: boolean
   montoACargo: number
+  montoACargoCredito: number | null
   /** Si la obra social cubrió algo: define cómo se redacta el mensaje. */
   hayCobertura: boolean
   validoHasta: string
@@ -97,7 +98,7 @@ async function traerDatos(presupuestoId: string): Promise<DatosEnvio | null> {
     supabase
       .from('presupuestos')
       .select(
-        'id, numero, estado, paciente_id, paciente_nombre, paciente_telefono, total_a_cargo, total_cobertura, valido_hasta, profesional_nombre, profesional_matricula, duplicado_de, paciente:pacientes(telefono, tiene_whatsapp)',
+        'id, numero, estado, paciente_id, paciente_nombre, paciente_telefono, total_a_cargo, total_a_cargo_credito, total_cobertura, valido_hasta, profesional_nombre, profesional_matricula, duplicado_de, paciente:pacientes(telefono, tiene_whatsapp)',
       )
       .eq('id', presupuestoId)
       .maybeSingle(),
@@ -131,6 +132,8 @@ async function traerDatos(presupuestoId: string): Promise<DatosEnvio | null> {
     telefono: textoOpcional(ficha?.telefono) ?? textoOpcional(fila.paciente_telefono),
     tieneWhatsapp: ficha?.tiene_whatsapp == null ? true : Boolean(ficha.tiene_whatsapp),
     montoACargo: monto(fila.total_a_cargo),
+    montoACargoCredito:
+      fila.total_a_cargo_credito == null ? null : monto(fila.total_a_cargo_credito),
     // Por el monto y no por la obra social: un presupuesto con obra
     // social que no cubrió nada tampoco tiene «cobertura descontada».
     hayCobertura: monto(fila.total_cobertura) > 0,
@@ -273,6 +276,7 @@ export function SheetWhatsApp({
         pacienteNombre: datos.pacienteNombre,
         numero: datos.numero,
         montoACargo: datos.montoACargo,
+        montoACargoCredito: datos.montoACargoCredito,
         hayCobertura: datos.hayCobertura,
         validoHasta: datos.validoHasta,
         profesionalNombre: datos.profesionalNombre,
@@ -297,6 +301,7 @@ export function SheetWhatsApp({
         pacienteNombre: datos.pacienteNombre,
         numero: datos.numero,
         montoACargo: datos.montoACargo,
+        montoACargoCredito: datos.montoACargoCredito,
         hayCobertura: datos.hayCobertura,
         validoHasta: datos.validoHasta,
         profesionalNombre: datos.profesionalNombre,

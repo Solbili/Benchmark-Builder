@@ -293,6 +293,27 @@ export const estilos = StyleSheet.create({
     lineHeight: 1.3,
     color: COLOR.ink,
   },
+  /** La fila del precio en crédito, debajo de la caja: aire para despegarse. */
+  filaCredito: {
+    marginTop: px(6),
+    alignItems: 'flex-start',
+  },
+  /** El texto ocupa lo que sobra y envuelve; el monto nunca se achica. */
+  etiquetaCredito: {
+    flex: 1,
+    paddingRight: px(12),
+    fontSize: TIPO.cuerpo,
+    lineHeight: 1.35,
+    color: COLOR.body,
+  },
+  montoCredito: {
+    flexShrink: 0,
+    fontFamily: FAMILIA_TEXTO,
+    fontWeight: PESO_MEDIO,
+    fontSize: TIPO.fuerte,
+    lineHeight: 1.3,
+    color: COLOR.ink,
+  },
   cajaACargo: {
     marginTop: px(8),
     backgroundColor: COLOR.tint,
@@ -309,6 +330,13 @@ export const estilos = StyleSheet.create({
     lineHeight: 1.3,
     letterSpacing: 0.7,
     color: COLOR.primaryHover,
+  },
+  /** Cómo se paga el número héroe, cuando hay otra forma con otro precio. */
+  notaACargo: {
+    marginTop: px(1),
+    fontSize: TIPO.cuerpo,
+    lineHeight: 1.3,
+    color: COLOR.body,
   },
   /** Número héroe: 26 px del handoff. */
   montoACargo: {

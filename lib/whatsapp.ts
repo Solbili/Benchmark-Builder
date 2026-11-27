@@ -66,6 +66,12 @@ export interface DatosMensaje {
    * existía en el producto: lo que faltaba era que el mensaje lo usara.
    */
   hayCobertura: boolean
+  /**
+   * A cargo pagando con crédito, congelado en el documento. null o
+   * ausente = el presupuesto no ofrece esa opción y el mensaje no la
+   * nombra.
+   */
+  montoACargoCredito?: number | null
   /** `YYYY-MM-DD`. */
   validoHasta: string
   profesionalNombre: string
@@ -121,12 +127,18 @@ export function armarMensaje(plantilla: PlantillaWhatsApp, datos: DatosMensaje):
   const conCobertura = datos.hayCobertura
     ? ', ya con la cobertura descontada'
     : ', que es el total del tratamiento'
+  // El precio en crédito es otro precio de lista, no un recargo: se
+  // nombra con su número y su condición, igual que en el PDF.
+  const credito =
+    datos.montoACargoCredito != null
+      ? ` Con tarjeta de crédito son ${money(datos.montoACargoCredito)}, en 3 cuotas sin interés los miércoles.`
+      : ''
 
   const cuerpo: Record<PlantillaWhatsApp, string> = {
     primer_envio: [
       `Hola ${nombre}, ¿cómo estás?`,
       '',
-      `Te paso el presupuesto ${datos.numero} de lo que vimos en la consulta. Queda a cargo tuyo ${monto}${conCobertura}.`,
+      `Te paso el presupuesto ${datos.numero} de lo que vimos en la consulta. Queda a cargo tuyo ${monto}${conCobertura}.${credito}`,
       '',
       `${vigencia} Cualquier duda escribime por acá y lo vemos juntos.`,
     ].join('\n'),
@@ -134,7 +146,7 @@ export function armarMensaje(plantilla: PlantillaWhatsApp, datos: DatosMensaje):
     recordatorio: [
       `Hola ${nombre}, ¿cómo va?`,
       '',
-      `Te escribo por el presupuesto ${datos.numero} que te había pasado, para saber si pudiste verlo. Queda a cargo tuyo ${monto}.`,
+      `Te escribo por el presupuesto ${datos.numero} que te había pasado, para saber si pudiste verlo. Queda a cargo tuyo ${monto}.${credito}`,
       '',
       `${vigencia} Si querés arrancar, o si preferís que veamos otra alternativa, decime y lo charlamos sin problema.`,
     ].join('\n'),
@@ -142,7 +154,7 @@ export function armarMensaje(plantilla: PlantillaWhatsApp, datos: DatosMensaje):
     actualizacion: [
       `Hola ${nombre}, ¿cómo estás?`,
       '',
-      `Te paso el presupuesto ${datos.numero} con los valores de hoy: reemplaza al que te había mandado antes. Queda a cargo tuyo ${monto}.`,
+      `Te paso el presupuesto ${datos.numero} con los valores de hoy: reemplaza al que te había mandado antes. Queda a cargo tuyo ${monto}.${credito}`,
       '',
       `${vigencia} Si tenías dudas con el anterior, avisame y lo repasamos.`,
     ].join('\n'),

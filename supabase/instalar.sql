@@ -491,7 +491,8 @@ create or replace function nueva_vigencia(
   p_monto         numeric,
   p_cob_tipo      tipo_cobertura,
   p_cob_valor     numeric,
-  p_desde         date
+  p_desde         date,
+  p_monto_credito numeric default null
 ) returns uuid
 language plpgsql security definer
 set search_path = public
@@ -525,9 +526,9 @@ begin
      and obra_social_id is not distinct from p_obra_social
      and vigente_hasta is null;
 
-  insert into aranceles (prestacion_id, obra_social_id, monto,
+  insert into aranceles (prestacion_id, obra_social_id, monto, monto_credito,
                          cobertura_tipo, cobertura_valor, vigente_desde, created_by)
-  values (p_prestacion, p_obra_social, p_monto,
+  values (p_prestacion, p_obra_social, p_monto, p_monto_credito,
           p_cob_tipo, p_cob_valor, p_desde, auth.uid())
   returning id into v_id;
 
@@ -561,7 +562,8 @@ begin
   end if;
 
   for r in
-    select a.prestacion_id, a.obra_social_id, a.monto, a.cobertura_tipo, a.cobertura_valor
+    select a.prestacion_id, a.obra_social_id, a.monto, a.monto_credito,
+           a.cobertura_tipo, a.cobertura_valor
       from aranceles a
       join prestaciones p on p.id = a.prestacion_id
      where a.vigente_hasta is null
@@ -581,7 +583,8 @@ begin
       round(r.monto * (100 + p_pct) / 100),
       r.cobertura_tipo,
       r.cobertura_valor,
-      p_desde
+      p_desde,
+      round(r.monto_credito * (100 + p_pct) / 100)
     );
     n := n + 1;
   end loop;
@@ -621,9 +624,13 @@ declare
   v_tipo          tipo_cobertura;
   v_valor         numeric;
   v_cob           numeric;
+  v_credito       numeric;
+  v_cargo_credito numeric;
+  v_hay_credito   boolean := false;
   v_subtotal      numeric := 0;
   v_total_cob     numeric := 0;
   v_total_cargo   numeric := 0;
+  v_total_credito numeric := 0;
   v_acum          numeric := 0;
   v_cuotas_n      int;
   v_cuotas_creadas int := 0;
@@ -692,15 +699,24 @@ begin
   -- ── Ítems: snapshot completo, cobertura resuelta en el servidor ──
   for v_item in select * from jsonb_array_elements(p_payload -> 'items')
   loop
-    v_monto := (v_item ->> 'monto')::numeric;
-    v_tipo  := coalesce((v_item ->> 'cobertura_tipo')::tipo_cobertura, 'ninguna');
-    v_valor := coalesce((v_item ->> 'cobertura_valor')::numeric, 0);
-    v_cob   := calcular_cobertura(v_monto, v_tipo, v_valor);
+    v_monto   := (v_item ->> 'monto')::numeric;
+    v_tipo    := coalesce((v_item ->> 'cobertura_tipo')::tipo_cobertura, 'ninguna');
+    v_valor   := coalesce((v_item ->> 'cobertura_valor')::numeric, 0);
+    v_cob     := calcular_cobertura(v_monto, v_tipo, v_valor);
+    v_credito := nullif(v_item ->> 'monto_credito', '')::numeric;
+
+    if v_credito is not null then
+      v_cargo_credito := v_credito - calcular_cobertura(v_credito, v_tipo, v_valor);
+      v_hay_credito   := true;
+    else
+      v_cargo_credito := null;
+    end if;
 
     insert into presupuesto_items (
       presupuesto_id, orden, prestacion_id, arancel_id,
       nombre, codigo, descripcion, detalle,
       monto, cobertura_tipo, cobertura_valor, cobertura_monto, a_cargo,
+      monto_credito, a_cargo_credito,
       editado, cobertura_original_tipo, cobertura_original_valor, motivo_override
     ) values (
       v_id, v_orden,
@@ -711,16 +727,18 @@ begin
       nullif(v_item ->> 'descripcion', ''),
       nullif(v_item ->> 'detalle', ''),
       v_monto, v_tipo, v_valor, v_cob, v_monto - v_cob,
+      v_credito, v_cargo_credito,
       coalesce((v_item ->> 'editado')::boolean, false),
       nullif(v_item ->> 'cobertura_original_tipo', '')::tipo_cobertura,
       nullif(v_item ->> 'cobertura_original_valor', '')::numeric,
       nullif(v_item ->> 'motivo_override', '')
     );
 
-    v_subtotal    := v_subtotal + v_monto;
-    v_total_cob   := v_total_cob + v_cob;
-    v_total_cargo := v_total_cargo + (v_monto - v_cob);
-    v_orden       := v_orden + 1;
+    v_subtotal      := v_subtotal + v_monto;
+    v_total_cob     := v_total_cob + v_cob;
+    v_total_cargo   := v_total_cargo + (v_monto - v_cob);
+    v_total_credito := v_total_credito + coalesce(v_cargo_credito, v_monto - v_cob);
+    v_orden         := v_orden + 1;
   end loop;
 
   -- ── Cuotas: el porcentaje manda, la última absorbe el redondeo ──
@@ -756,6 +774,7 @@ begin
      set subtotal = v_subtotal,
          total_cobertura = v_total_cob,
          total_a_cargo = v_total_cargo,
+         total_a_cargo_credito = case when v_hay_credito then v_total_credito end,
          estado = v_estado,
          estado_desde = now()
    where id = v_id;
@@ -803,11 +822,15 @@ declare
   v_tipo        tipo_cobertura;
   v_valor       numeric;
   v_cob         numeric;
+  v_credito     numeric;
+  v_cargo_credito numeric;
+  v_hay_credito boolean := false;
   v_arancel_id  uuid;
   v_vig_dias    int;
   v_subtotal    numeric := 0;
   v_total_cob   numeric := 0;
   v_total_cargo numeric := 0;
+  v_total_credito numeric := 0;
   v_orden       int := 0;
   v_overrides   int := 0;
   v_cuota       record;
@@ -873,11 +896,13 @@ begin
 
     if v_ar.id is not null then
       v_monto      := v_ar.monto;
+      v_credito    := v_ar.monto_credito;
       v_tipo       := v_ar.cobertura_tipo;
       v_valor      := v_ar.cobertura_valor;
       v_arancel_id := v_ar.id;
     else
       v_monto      := v_it.monto;
+      v_credito    := v_it.monto_credito;
       v_tipo       := v_it.cobertura_tipo;
       v_valor      := v_it.cobertura_valor;
       v_arancel_id := v_it.arancel_id;
@@ -885,23 +910,33 @@ begin
 
     v_cob := calcular_cobertura(v_monto, v_tipo, v_valor);
 
+    if v_credito is not null then
+      v_cargo_credito := v_credito - calcular_cobertura(v_credito, v_tipo, v_valor);
+      v_hay_credito   := true;
+    else
+      v_cargo_credito := null;
+    end if;
+
     insert into presupuesto_items (
       presupuesto_id, orden, prestacion_id, arancel_id,
       nombre, codigo, descripcion, detalle,
-      monto, cobertura_tipo, cobertura_valor, cobertura_monto, a_cargo
+      monto, cobertura_tipo, cobertura_valor, cobertura_monto, a_cargo,
+      monto_credito, a_cargo_credito
     ) values (
       v_new, v_orden, v_it.prestacion_id, v_arancel_id,
       coalesce((select nombre from prestaciones where id = v_it.prestacion_id), v_it.nombre),
       v_it.codigo,
       coalesce((select descripcion from prestaciones where id = v_it.prestacion_id), v_it.descripcion),
       v_it.detalle,
-      v_monto, v_tipo, v_valor, v_cob, v_monto - v_cob
+      v_monto, v_tipo, v_valor, v_cob, v_monto - v_cob,
+      v_credito, v_cargo_credito
     );
 
-    v_subtotal    := v_subtotal + v_monto;
-    v_total_cob   := v_total_cob + v_cob;
-    v_total_cargo := v_total_cargo + (v_monto - v_cob);
-    v_orden       := v_orden + 1;
+    v_subtotal      := v_subtotal + v_monto;
+    v_total_cob     := v_total_cob + v_cob;
+    v_total_cargo   := v_total_cargo + (v_monto - v_cob);
+    v_total_credito := v_total_credito + coalesce(v_cargo_credito, v_monto - v_cob);
+    v_orden         := v_orden + 1;
   end loop;
 
   select count(*) into v_cuotas_n from presupuesto_cuotas where presupuesto_id = p_id;
@@ -930,7 +965,8 @@ begin
   update presupuestos
      set subtotal = v_subtotal,
          total_cobertura = v_total_cob,
-         total_a_cargo = v_total_cargo
+         total_a_cargo = v_total_cargo,
+         total_a_cargo_credito = case when v_hay_credito then v_total_credito end
    where id = v_new;
 
   select count(*) into v_overrides
@@ -1319,6 +1355,7 @@ begin
      or new.subtotal           is distinct from old.subtotal
      or new.total_cobertura    is distinct from old.total_cobertura
      or new.total_a_cargo      is distinct from old.total_a_cargo
+     or new.total_a_cargo_credito is distinct from old.total_a_cargo_credito
      or new.observaciones      is distinct from old.observaciones
      or new.duplicado_de       is distinct from old.duplicado_de
      or new.created_by         is distinct from old.created_by
@@ -2495,3 +2532,111 @@ comment on index obras_sociales_nombre_sin_plan_key is
 
 revoke execute on function crear_presupuesto(jsonb) from public, anon;
 grant execute on function crear_presupuesto(jsonb) to authenticated;
+
+
+-- ─── precio credito ───────────────────────────────────────
+
+
+-- ─────────────────────────────────────────────────────────────
+-- 1) Columnas
+-- ─────────────────────────────────────────────────────────────
+
+alter table aranceles
+  add column if not exists monto_credito numeric(12,2);
+
+alter table aranceles
+  drop constraint if exists aranceles_monto_credito_no_negativo,
+  add constraint aranceles_monto_credito_no_negativo
+    check (monto_credito is null or monto_credito >= 0);
+
+comment on column aranceles.monto_credito is
+  'Precio de lista pagando con crédito (3 cuotas sin interés, miércoles). '
+  'Null = esta celda no tiene precio en crédito. Append-only como monto.';
+
+alter table presupuesto_items
+  add column if not exists monto_credito   numeric(12,2),
+  add column if not exists a_cargo_credito numeric(12,2);
+
+alter table presupuesto_items
+  drop constraint if exists presupuesto_items_credito_coherente,
+  add constraint presupuesto_items_credito_coherente
+    check (
+      (monto_credito is null and a_cargo_credito is null)
+      or (monto_credito >= 0 and a_cargo_credito between 0 and monto_credito)
+    );
+
+alter table presupuestos
+  add column if not exists total_a_cargo_credito numeric(12,2);
+
+alter table presupuestos
+  drop constraint if exists presupuestos_total_credito_no_negativo,
+  add constraint presupuestos_total_credito_no_negativo
+    check (total_a_cargo_credito is null or total_a_cargo_credito >= 0);
+
+-- ─────────────────────────────────────────────────────────────
+-- 2) El total en crédito también queda congelado al emitir
+--
+-- Misma guarda de la 20 con la columna nueva en la lista.
+-- ─────────────────────────────────────────────────────────────
+
+
+-- ─────────────────────────────────────────────────────────────
+-- 3) Nueva vigencia con precio en crédito
+--
+-- El parámetro nuevo va al final y con default: la app que está en
+-- producción llama con seis argumentos nombrados y tiene que seguir
+-- andando mientras se despliega la nueva. Se borra la firma vieja para
+-- que no queden dos funciones y PostgREST no tenga que elegir.
+-- ─────────────────────────────────────────────────────────────
+
+drop function if exists nueva_vigencia(uuid, uuid, numeric, tipo_cobertura, numeric, date);
+
+
+revoke execute on function nueva_vigencia(uuid, uuid, numeric, tipo_cobertura, numeric, date, numeric) from public, anon;
+grant execute on function nueva_vigencia(uuid, uuid, numeric, tipo_cobertura, numeric, date, numeric) to authenticated;
+
+-- ─────────────────────────────────────────────────────────────
+-- 4) El aumento masivo sube los dos precios
+--
+-- Sin esto, un +10 % abría una vigencia nueva con el precio en crédito
+-- en null: el aumento borraba la opción de pagar con crédito sin que
+-- nadie lo pidiera. Misma cuenta que `montoConAumento()`.
+-- ─────────────────────────────────────────────────────────────
+
+
+revoke execute on function aumento_masivo(text, uuid, boolean, numeric, date) from public, anon;
+grant execute on function aumento_masivo(text, uuid, boolean, numeric, date) to authenticated;
+
+-- ─────────────────────────────────────────────────────────────
+-- 5) Las vistas de la pantalla 10
+--
+-- `a.*` se expande al crear la vista: sin recrearlas, la columna nueva
+-- no aparece. Y `create or replace` sólo deja agregar al final, así que
+-- van con drop. Mismas definiciones que la 07.
+-- ─────────────────────────────────────────────────────────────
+
+
+grant select on aranceles_vigentes, aranceles_programados to authenticated;
+
+-- ─────────────────────────────────────────────────────────────
+-- 6) El alta congela el precio en crédito
+--
+-- Igual a la 25 más el crédito: el ítem lo trae del arancel (el wizard
+-- lo copia al elegir la prestación) y la base resuelve el a-cargo.
+-- ─────────────────────────────────────────────────────────────
+
+
+revoke execute on function crear_presupuesto(jsonb) from public, anon;
+grant execute on function crear_presupuesto(jsonb) to authenticated;
+
+-- ─────────────────────────────────────────────────────────────
+-- 7) Duplicar trae el precio en crédito de hoy
+--
+-- Igual a la 14 más el crédito. Con arancel vigente, el de hoy (que
+-- puede no tener precio en crédito: entonces el duplicado no lo ofrece).
+-- Sin arancel vigente, el que traía el ítem original.
+-- ─────────────────────────────────────────────────────────────
+
+
+revoke execute on function duplicar_presupuesto(uuid) from public, anon;
+grant execute on function duplicar_presupuesto(uuid) to authenticated;

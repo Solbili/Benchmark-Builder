@@ -2,7 +2,7 @@
 
 import { Monto } from '@/components/ui'
 import { estaCerrado } from '@/lib/estados'
-import { porcentaje } from '@/lib/formato'
+import { PAGO_CREDITO, PAGO_EFECTIVO, porcentaje } from '@/lib/formato'
 import type { PresupuestoCuota } from '@/lib/types'
 
 import { useDetalle } from './contexto'
@@ -23,6 +23,7 @@ export function Totales({
   subtotal,
   cobertura,
   aCargo,
+  aCargoCredito = null,
   cuotas,
   fallaronCuotas,
   observaciones,
@@ -30,6 +31,11 @@ export function Totales({
   subtotal: number
   cobertura: number
   aCargo: number
+  /**
+   * Lo que queda a cargo pagando con crédito, congelado al emitir.
+   * null = el presupuesto no ofrece esa opción y no se dibuja nada.
+   */
+  aCargoCredito?: number | null
   cuotas: PresupuestoCuota[]
   /**
    * La lectura de las condiciones de pago no llegó.
@@ -64,7 +70,12 @@ export function Totales({
         </div>
 
         <div className="mt-1 flex items-baseline justify-between gap-4 border-t border-primary/20 pt-3">
-          <dt className="font-sans text-[14px] font-semibold text-ink">A cargo del paciente</dt>
+          <dt className="font-sans text-[14px] font-semibold text-ink">
+            A cargo del paciente
+            {aCargoCredito !== null && (
+              <span className="block t-helper font-normal">{PAGO_EFECTIVO}</span>
+            )}
+          </dt>
           <dd>
             <Monto
               valor={aCargo}
@@ -73,6 +84,15 @@ export function Totales({
             />
           </dd>
         </div>
+
+        {aCargoCredito !== null && (
+          <div className="flex items-baseline justify-between gap-4">
+            <dt className="t-helper">{PAGO_CREDITO}</dt>
+            <dd>
+              <Monto valor={aCargoCredito} jerarquia={cerrado ? 'apagado' : 'fuerte'} />
+            </dd>
+          </div>
+        )}
       </dl>
 
       {fallaronCuotas && (

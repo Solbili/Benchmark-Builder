@@ -299,6 +299,11 @@ function Precio({
             ? etiquetaCobertura(celda.vigente.cobertura_tipo, Number(celda.vigente.cobertura_valor))
             : `Recién desde el ${fechaCorta(celda.programada!.vigente_desde)}`}
         </span>
+        {(celda.vigente ?? celda.programada)?.monto_credito != null && (
+          <span className="block t-helper tnum">
+            Crédito {money((celda.vigente ?? celda.programada)!.monto_credito)}
+          </span>
+        )}
         {celda.vigente && celda.programada && (
           <span className="flex items-center gap-1 t-helper text-warm-ink">
             <CalendarClock aria-hidden className="size-3" />

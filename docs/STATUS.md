@@ -1,6 +1,6 @@
 # Estado del proyecto — Smile Lab · Presupuestos
 
-> **Última actualización:** 2026-10-04
+> **Última actualización:** 2026-11-27
 > Este documento es la fuente de verdad del estado del proyecto. Si cambia el
 > esquema, el pipeline, una pantalla o una variable de entorno, se actualiza
 > acá **en el mismo commit**.
@@ -37,6 +37,7 @@ Consecuencias que el código respeta hoy:
 | 6 | El historial no se borra ni se edita | Trigger `trg_evento_inmutable`, policies sólo SELECT/INSERT |
 | 7 | Un arancel usado no cambia de prestación ni de obra social | `guard_arancel_inmutable` |
 | 8 | Un ítem no puede quedar con a-cargo negativo | Checks de `presupuesto_items` + tope en `calcular_cobertura` y `calcularItem` |
+| 9 | El precio en crédito también se congela | `presupuesto_items.monto_credito` / `a_cargo_credito` y `presupuestos.total_a_cargo_credito`, en la lista de `guard_presupuesto_emitido` (migración 26) |
 
 ---
 
@@ -115,6 +116,7 @@ Migraciones en `supabase/migrations/`, en este orden:
 | `20260101002200_buscar_sin_acentos.sql` | `unaccent` + `sin_acentos()` · columna `busqueda` generada en `pacientes` y `presupuestos` con índice trigram · la vista `presupuestos_listado` la expone sumándole la prestación principal |
 | `20260101002300_catalogo_sin_duplicados.sql` | Unicidad real del catálogo: dos NULL no son iguales en Postgres, así que `unique (nombre, plan)` dejaba pasar dos obras sociales con el mismo nombre y sin plan. Índices parciales sobre `lower(nombre)`, y lo mismo para `prestaciones` |
 | `20260101002400_afiliado_de_su_obra_social.sql` | El nro de afiliado se congela sólo si el presupuesto es para la MISMA obra social que la ficha. Con la cobertura cambiada a mano, el documento salía con el número de la otra |
+| `20260101002500_precio_credito.sql` | **Precio en crédito** (3 cuotas sin interés, los miércoles): `aranceles.monto_credito` (append-only como el monto; null = sin precio en crédito), `presupuesto_items.monto_credito` + `a_cargo_credito`, `presupuestos.total_a_cargo_credito`, todo congelado al emitir. `nueva_vigencia` suma `p_monto_credito` (al final y con default: la app vieja sigue andando); `aumento_masivo` sube los dos precios; las vistas `aranceles_vigentes` y `aranceles_programados` se recrean para exponer la columna. Trae entera la `crear_presupuesto()` de la 25 |
 
 **Sin la CLI**: `supabase/instalar.sql` e `instalar-storage.sql` son las mismas
 migraciones concatenadas en orden, para pegar en el SQL Editor de Supabase. Se
@@ -131,9 +133,9 @@ que las toca.
 | `pacientes` | Ficha. `obra_social_id` precarga el paso 1 del wizard |
 | `prestaciones` | Catálogo. `descripcion` es la plantilla que se copia |
 | `prestacion_cuotas` | Plantilla de condiciones de pago (suma 100 %) |
-| `aranceles` | **Append-only** con vigencias. `obra_social_id` null = particular |
-| `presupuestos` | Cabecera + snapshot de contexto + totales congelados. `clave_alta` es la clave de idempotencia del alta (única, parcial) |
-| `presupuesto_items` | **El documento**: snapshot completo de cada prestación |
+| `aranceles` | **Append-only** con vigencias. `obra_social_id` null = particular. `monto` es el precio en efectivo o transferencia; `monto_credito` el de crédito en 3 cuotas sin interés (null = no tiene) |
+| `presupuestos` | Cabecera + snapshot de contexto + totales congelados. `clave_alta` es la clave de idempotencia del alta (única, parcial). `total_a_cargo_credito` null = el documento no ofrece pagar con crédito |
+| `presupuesto_items` | **El documento**: snapshot completo de cada prestación, incluidos `monto_credito` y `a_cargo_credito` |
 | `presupuesto_cuotas` | Condiciones de pago congeladas |
 | `presupuesto_eventos` | Historial append-only que alimenta el timeline |
 
@@ -163,10 +165,10 @@ que las toca.
 | `calcular_cobertura(monto, tipo, valor)` | Espejo SQL de `lib/calculo.ts`, con la cobertura acotada a `[0, monto]`. **Si cambia una, cambia la otra**; `npm run test:paridad` lo verifica contra una base real |
 | `arancel_vigente(prestacion, obra_social, fecha)` | El arancel que rige en una fecha. Única definición de «vigente» |
 | `actor_nombre()` | Nombre legible del usuario para los eventos |
-| `nueva_vigencia(...)` | Cierra la vigencia abierta e inserta la nueva, atómico |
-| `aumento_masivo(rubro, os, solo_particular, pct, desde)` | Una llamada a `nueva_vigencia` por fila, en una transacción |
-| `crear_presupuesto(jsonb)` | Congela cabecera + ítems + cuotas + evento. Inserta como borrador y promueve el estado al final (lo exige `guard_item_emitido`). **Idempotente por `clave_alta`**: si esa clave ya emitió un documento devuelve ese mismo, incluso si dos pedidos llegan a la vez |
-| `duplicar_presupuesto(uuid)` | Copia re-resolviendo contra los aranceles vigentes hoy |
+| `nueva_vigencia(..., p_monto_credito)` | Cierra la vigencia abierta e inserta la nueva, atómico. El precio en crédito es opcional |
+| `aumento_masivo(rubro, os, solo_particular, pct, desde)` | Una llamada a `nueva_vigencia` por fila, en una transacción. Sube el precio en efectivo y el de crédito con la misma cuenta |
+| `crear_presupuesto(jsonb)` | Congela cabecera + ítems + cuotas + evento. El a-cargo en crédito sale de `calcular_cobertura(monto_credito, …)`: la obra social cubre lo mismo pague como pague. En el total, el ítem sin precio en crédito suma su a-cargo de efectivo Inserta como borrador y promueve el estado al final (lo exige `guard_item_emitido`). **Idempotente por `clave_alta`**: si esa clave ya emitió un documento devuelve ese mismo, incluso si dos pedidos llegan a la vez |
+| `duplicar_presupuesto(uuid)` | Copia re-resolviendo contra los aranceles vigentes hoy, precio en crédito incluido |
 | `cambiar_estado(id, estado, motivo, nota)` | Transición + evento. Bloquea la vuelta a borrador |
 | `registrar_evento(id, tipo, desc)` | Evento suelto (nota, PDF, WhatsApp) |
 | `marcar_pendientes()` | `enviado → pendiente` a los 7 días. Sólo `service_role` |
@@ -224,8 +226,8 @@ borrador → realizado → enviado → pendiente → interesado → aceptado →
 | 04-06 | `/?nuevo=1` | Wizard 3 pasos, modal sobre la ruta actual |
 | 07-08 | — | Comboboxes con creación al vuelo; prestación encadena arancel |
 | 09 | `/biblioteca` | Tabs de entidades |
-| 10 | `/biblioteca/aranceles` | Lista por prestación (particular + obras sociales con precio), drawer de vigencias, aumento masivo |
-| 11 | `/presupuestos/[id]` | Detalle, banner de precio, timeline |
+| 10 | `/biblioteca/aranceles` | Lista por prestación (particular + obras sociales con precio), drawer de vigencias, aumento masivo. La vigencia nueva carga el precio en efectivo y, opcional, el de crédito |
+| 11 | `/presupuestos/[id]` | Detalle, banner de precio, timeline. Si el documento tiene precio en crédito, el total lo muestra debajo del a-cargo (y lo repiten el PDF y el WhatsApp) |
 | 12 | `/pipeline` | Kanban desde tablet (≥ 768px): un solo scroll, encabezados de columna y franja de perdidos pegados |
 | 13 | `/api/presupuestos/[id]/pdf` | A4, cacheado en Storage mientras el presupuesto esté emitido |
 | 14 | — | Sheet de WhatsApp (`?whatsapp=1` en el detalle) |
@@ -451,6 +453,13 @@ En **Storage**: bucket privado `presupuestos`, signed URL de 7 días.
 - [x] PDF A4 cacheado en Storage (13)
 - [x] Sheet de WhatsApp con plantillas y `navigator.share` (14)
 - [x] Cron `enviado → pendiente`
+- [x] Precio en crédito (3 cuotas sin interés, los miércoles) como segundo
+      precio de lista: se carga en la vigencia, el wizard lo copia del arancel
+      y el documento congela el total en crédito. Detalle, preview del paso 3,
+      PDF y mensaje de WhatsApp lo muestran con el mismo texto
+      (`PAGO_CREDITO` en `lib/formato.ts`). Con el monto editado a mano el
+      ítem deja de ofrecerlo: la lista no dice cuánto sería ESE precio en
+      crédito (`creditoDelItem()`)
 
 - [x] Suite de tests del núcleo: `npm test` (40 casos sobre `lib/calculo.ts`,
       `lib/formato.ts` y `lib/estados.ts`) y `npm run test:paridad`, que
@@ -680,6 +689,12 @@ antes de aceptarlo. Los que resultaron reales:
       de buscar.
 - [ ] Registro de autorizaciones previas de obra social.
 - [ ] Cuotas con interés o financiación en más de dos pagos.
+- [ ] Precio en crédito: cargarlo también desde el alta rápida de arancel del
+      wizard (hoy sólo desde la pantalla 10), mostrarlo por ítem en el paso 2
+      y en la tabla del detalle (hoy sólo en los totales), y sumar al preview
+      del aumento masivo la columna de crédito (la RPC ya lo sube).
+- [ ] Precios en dólares: «Implantes 650 USD» de la lista nueva no se puede
+      cargar, la base sólo maneja pesos.
 - [ ] Recordatorio automático a los 7 días por WhatsApp (hoy sólo se promete en
       la confirmación de envío; el cambio de estado sí es automático).
 - [ ] Decidir si un presupuesto con subtotal $ 0 debe rechazarse. Hoy se

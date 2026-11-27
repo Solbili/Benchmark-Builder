@@ -76,6 +76,46 @@ export function calcularTotales(items: TotalesLinea[]): Totales {
 }
 
 /**
+ * Lo que queda a cargo pagando con crédito.
+ *
+ * La obra social cubre lo mismo pague como pague el paciente: es la
+ * misma cuenta de `calcularItem` sobre el precio en crédito. Espejo de
+ * `crear_presupuesto()` (migración 26).
+ */
+export function aCargoCredito(
+  montoCredito: number,
+  tipo: CoberturaTipo,
+  valor: number,
+): number {
+  return calcularItem(montoCredito, tipo, valor).aCargo
+}
+
+export interface LineaCredito extends TotalesLinea {
+  monto_credito: number | null
+}
+
+/**
+ * Total a cargo pagando con crédito. `null` cuando ninguna línea tiene
+ * precio en crédito: entonces el presupuesto no ofrece la opción.
+ *
+ * Una línea sin precio en crédito suma su a-cargo de efectivo: es lo
+ * que el consultorio cobra por ella, pague como pague. Misma regla que
+ * `crear_presupuesto()`.
+ */
+export function totalCredito(items: LineaCredito[]): number | null {
+  if (!items.some((i) => i.monto_credito !== null)) return null
+  return items.reduce((total, i) => {
+    const efectivo = calcularItem(i.monto, i.cobertura_tipo, i.cobertura_valor).aCargo
+    return (
+      total +
+      (i.monto_credito === null
+        ? efectivo
+        : aCargoCredito(i.monto_credito, i.cobertura_tipo, i.cobertura_valor))
+    )
+  }, 0)
+}
+
+/**
  * Reparte un total entre cuotas por porcentaje. La última absorbe el
  * resto para que la suma cierre exacta contra el total a cargo — igual
  * que `crear_presupuesto()` en la base.
@@ -145,7 +185,8 @@ export function compararConHoy(
 /**
  * Monto resultante de aplicar un porcentaje de aumento.
  *
- * El espejo en SQL es la cuenta de `aumento_masivo()`. Igual que en
+ * El espejo en SQL es la cuenta de `aumento_masivo()`, que la aplica al
+ * precio de efectivo y al de crédito por igual. Igual que en
  * `calcularItem`, se trabaja en centésimas y se multiplica ANTES de
  * dividir: `monto * (1 + pct / 100)` en punto flotante se desvía medio
  * peso en los casos que caen justo en .5, y entonces el preview del

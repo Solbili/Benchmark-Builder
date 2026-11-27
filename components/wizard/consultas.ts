@@ -377,6 +377,8 @@ export interface NuevaVigencia {
   monto: number
   cobertura_tipo: CoberturaTipo
   cobertura_valor: number
+  /** Precio en crédito. Por defecto, sin precio en crédito. */
+  monto_credito?: number | null
   /** Por defecto hoy. */
   desde?: string
 }
@@ -397,6 +399,7 @@ export function useCrearArancel() {
         p_cob_tipo: datos.cobertura_tipo,
         p_cob_valor: datos.cobertura_valor,
         p_desde: desde,
+        p_monto_credito: datos.monto_credito ?? null,
       })
       if (error) throw new Error(error.message)
 
@@ -407,6 +410,7 @@ export function useCrearArancel() {
         prestacion_id: datos.prestacion_id,
         obra_social_id: datos.obra_social_id,
         monto: datos.monto,
+        monto_credito: datos.monto_credito ?? null,
         cobertura_tipo: datos.cobertura_tipo,
         cobertura_valor: datos.cobertura_valor,
         vigente_desde: desde,
